@@ -17,7 +17,7 @@ class Server:
         self.__dataset = None
         self.__indexed_dataset = None
 
-    def dataset(self) -> List[List]:
+    def dataset(self) -> List[List]:  # sourcery skip: identity-comprehension
         """Cached dataset
         """
         if self.__dataset is None:
@@ -40,16 +40,33 @@ class Server:
         return self.__indexed_dataset
 
     def get_hyper_index(self, index: int = None, page_size: int = 10) -> Dict:
-        """
-        Return a dictionary:
-        index: the current start index of the return page. That is
-        the index of the first item in the current page.
-        For example if requesting page 3 with page_size 20,
-        and no data was removed from the dataset, the current index
-        should be 60.
-        next_index: the next index to query with. That should be the
-        index of the first item after the last item on the current page.
-        page_size: the current page size
-        data: the actual page of the dataset
-        """
-        pass
+        """ Deletion-resilient hypermedia pagination """
+
+        idx_dataset = self.indexed_dataset()
+
+        assert isinstance(index, int) and index < (len(idx_dataset) - 1)
+
+        i, mv, data = 0, index, []
+        while (i < page_size and index < len(idx_dataset)):
+            value = idx_dataset.get(mv, None)
+            if value:
+                data.append(value)
+                i += 1
+            mv += 1
+
+        next_index = None
+        while (mv < len(idx_dataset)):
+            value = idx_dataset.get(mv, None)
+            if value:
+                next_index = mv
+                break
+            mv += 1
+
+        hyper = {
+            'index': index,
+            'next_index': next_index,
+            'page_size': page_size,
+            'data': data
+        }
+
+        return hyper
